@@ -1,0 +1,114 @@
+rs=8       /the first line is reserved for setting the register size 
+
+//It is possible to comment a code. Everything that is written after a comment symbol on a line is not taken into account by tightPROVE.
+//The four comment symbols are #  /  ;  %
+
+
+################DEFINING INPUTS
+
+in x y z        #'in' is a keyword that can be used to create variables. Multiple variables can be created in one line by separating them with a space
+in t            #Multiple lines can define variables
+in x1 ... x12   #indexed variables can be created easily by putting 3 dots between variables of the same name
+in y5 ... y1    #this can be done with decreasing indexes as well
+
+in T[3][4][5..2]   #multidimensional arrays of variables can be created this way. If one number n is between brackets,then the index for that dimension ranges from 0 to n-1. If 2 numbers a and b are present, however, it ranges from a to b (or b to a if b<a)
+in Tab[5..5]       #careful: this is considered equivalent to Tab[5], so it creates 5 variables
+
+
+################DEFINING CONSTANTS (for vslice version only) : one can use the sets of keywords ['setcst','SETCST','set_cst','SET_CST','cstset','CSTSET','cst_set','CST_SET'] and ['setcstall','SETCSTALL','set_cst_all','SET_CST_ALL','cstsetall','CSTSETALL','cst_set_all','CST_SET_ALL'] 
+#tightPROVE understands the difference between a variable dependent on the inputs of a circuit and a constant used in a circuit
+#here are some ways to set constants:
+c1=setcst(0xf0)    #'0x' must be used to signify that hexadecimal notation is used
+c2=setcst(0b1101)  #binary notation may be used with '0b'
+c3=setcst 0x0f     #parentheses are not necessary
+cp = setcst 0xa    #if the size of the number is not the register size, it is automatically padded with 0s, so 0xa is equivalent to 0x0a here
+setcst c4 0xfa     #other syntax without = sign
+setcst 0x3A c5     #the order of the constant and its value is not important. Also, hexadecimal numbers can be written with lowercase or uppercase characters
+setcstall c6 1     #sets c6 to the constant whose bits are all 1
+setcstall 0 c7     #sets c7 to the constant whose bits are all 0
+c8 = setcstall 1   #sets c8 to the constant whose bits are all 1
+
+
+################OPERATIONS 
+#there are different possible syntaxes: result = var1 operator var2   |   result = operator var1 var2   |   operator result var1 var2
+#but the program is very permissive in the sense that it can understand commands that are close to the ones presented above
+#let us give a few examples of correct commands
+
+####XOR: the different keywords for the addition are ["ADD","add","+","XOR","xor","Add","Xor","^"]
+temp1 = x + y  
+temp2=x+z               #spaces are not necessary
+temp2 = temp2 + y       #variables can be used multiple times, and can be updated this way
+temp3 = XOR(x1,x12)     #tightPROVE allows the use of functional notation
+ADD temp4 x3 T[2][3][2]
+addc = x + c1           #it is possible to add a constant to a variable, but this does not affect the security in any way
+
+
+####NOT: the different keywords for the NOT operator are ["NOT","Not","not","~"]
+#note that this operator does not affect the security in any way
+#also note that applying a NOT on a variable is equivalent to XORing it with a variable created with setcstall 1
+n1 = NOT x
+n2 = ~y
+
+
+####AND: the different keywords for the multiplication are ["AND","and","And","*","&","MULT","mult","Mult","."]
+m1=temp2.temp3
+m2 = temp1 * x
+and m3 temp1 temp2
+m4=MULT(x,y)
+mc = x & c3          #it is possible to multiply a constant with a variable. This allows the selection of certain bit of the variable
+                     #here, for example, the result we get is (x & 0x0f), which is the 8-bit register containing the 4 least significant bits of x
+
+
+####OR: the different keywords for this operator(which is equivalent to a multiplication in terms of security) are ["OR","Or","or","|",]
+
+m5= m4 OR temp1
+m6 = m4 | temp2
+
+
+####REFRESH: the different keywords for this operator are ["REF","ref","Ref","REFRESH","Refresh","refresh"]
+
+Ref x_r x
+y_r = ref(y)
+z_r = REF z    #parentheses are never necessary
+
+
+####ROTATIONS AND SHIFTS: the sets of operators are ["rotl","rot_l","L_ROTATE","<<<"] and ["rotr","rot_r","R_ROTATE",">>>"] for rotations and ["shiftl","shift_l","L_SHIFT","<<"] and ["shiftr","shift_r","R_SHIFT",">>"] for shifts.
+#the leftmost coordinate of a variable corresponds to the most significant bit
+#so the left or right rotations/shifts have obvious notations
+
+rot_r temp4 x 3         #makes a right rotation of 3 bits on x and stores it into temp4. The number must be written last
+shift_l temp4 temp4 1
+temp5 = t >>> 1         #when using chevrons, the number must be written last
+temp6 = rotr y 1        #
+temp7 = rotl 1 x        #when using keywords, the number and variable to rotate/shift can be swapped
+temp8 = t << 2
+
+
+####SUBTRACTION: subtraction can be done on a variable that only contains one non-constant coordinate on the least significant bit position. The keywords that can be used are ['SUB','Sub','sub','-']
+temp9 = x>>7       #for this operator we first need a variable containing one bit at the correct position
+temp10 = -temp9 
+temp11 = sub(temp9)
+temp12 = SUB temp9
+
+
+
+
+
+
+#This file can be recognised by tightPROVE as a valid description of a circuit. To do so, once you have loaded the tightPROVE.sage file, one can write for example 'simple_search_register("working_example",verbose=1,showtime=1)'
+#tightPROVE outputs [8 x 664 dense matrix over Finite Field of size 2], meaning that there is an 1 attack on an operand, of dimension 8 (all the 8 bits of the variable 'x' can be obtained with the attack).
+#more information can be obtained about the attack with a verbose >=3
+
+
+
+
+
+
+
+
+
+
+
+
+
+

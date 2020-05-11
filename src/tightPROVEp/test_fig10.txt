@@ -1,0 +1,11 @@
+in  0 
+in  1 
+in  2 
+xor 0 1
+xor 1 2
+and 0 1
+and 3 4
+and 3 2
+out 5 
+out 6 
+out 7 

@@ -1,0 +1,8 @@
+rs=32
+
+in x_
+
+f_V32_1__tmp1_ = x_ <<< 5
+f_V32_1__tmp3_ = x_ <<< 1
+f_V32_1__tmp2_ = and f_V32_1__tmp1_ x_
+y_ = xor f_V32_1__tmp2_ f_V32_1__tmp3_

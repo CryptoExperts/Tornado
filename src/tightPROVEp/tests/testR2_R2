@@ -1,0 +1,24 @@
+in x1 ... x4 
+out p2 m4 p5 p7 
+p1 = x2 + x3 
+p1_R = ref p1 
+m1 = x2 . p1_R 
+m2 = p1_R . x1 
+p2 = x1 + x3 
+p3 = x2 + p2 
+p3_R = ref p3 
+m3 = x2 . x3 
+p4 = m1 + m2 
+m4 = p2 . p3_R 
+p5 = p1 + x1 
+p6 = p1 + x3 
+p7 = m2 + m3 
+m5 = m1 . p5 
+p8 = p1 + x3 
+p9 = m1 + p8 
+p10 = x2 + m3 
+p11 = p1 + m5 
+p12 = x1 + p9 
+p13 = x1 + m5 
+m6 = p9 . p3_R 
+m7 = m3 . p4 

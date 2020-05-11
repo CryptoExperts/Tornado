@@ -1,0 +1,18 @@
+
+  for (int i = 0; i < 5; i++) printf("%016lx ",c__[i]);
+  printf("\n");
+
+  AddConstant__V64(c__,csts__[r__],_tmp63_);
+
+  for (int i = 0; i < 5; i++) printf("%016lx ",_tmp63_[i]);
+  printf("\n");
+
+  Sbox__V64(_tmp63_,_tmp64_);
+
+  for (int i = 0; i < 5; i++) printf("%016lx ",_tmp64_[i]);
+  printf("\n");
+
+  LinearLayer__V64(_tmp64_,cR__);
+
+  for (int i = 0; i < 5; i++) printf("%016lx ",cR__[i]);
+  printf("\n");

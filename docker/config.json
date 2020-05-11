@@ -1,0 +1,6 @@
+{
+    "data_dir":         "{{USUBA}}/data",
+    "tightprove_cache": "{{USUBA}}/tightprove_cache",
+    "sage":             "sage",
+    "tightprove":       "{{HOME}}/tornado/tightPROVEp/tightprove-exec.sage"
+}

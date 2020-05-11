@@ -1,0 +1,197 @@
+In order to use the tool tightPROVE, one needs the following modules:
+-time
+-numpy
+-sys
+-functools
+-itertools
+-multiprocessing
+-matplotlib.pyplot
+-random
+-datetime
+
+Since the code is written in Sage, one needs to have SageMath installed. When these condition are met, start the Sage interpreter using the 'sage' command.
+From the directory where the file tightPROVE.sage is, use the command 'load("tightPROVE.sage")'. You are now ready to use all the functions of the tool.
+
+We now give a description of the functions that can be used and their optional arguments.
+
+####################1. Search for attacks(bitslice)##################
+##########
+simple_search(filename,verbose=0,showtime=0,multiproc=0,order=0,approx=0):
+#from the description of a circuit in a file, searches for attacks
+#verbose=0: no information is written 
+#verbose=1: writes the operand checked in the form of a number, and whether there is an attack or not (along with the order of attack if order=1)
+#verbose=2: writes the final values of the sets G and O when there is no attack, and writes the span and the solutions if there is an attack
+#showtime enables the script to print the time it takes to finish each of its actions. It also displays the progression (with the time it took to check a given operand)
+#multiproc enables the use of multiprocessing to speed up the search. Disables verbose.
+#order makes the algorithm search for the least attack order (warning : this slows down the search for attacks)
+#approx sets how the least attack order is searched. 0 means it will be exact, and higher numbers means it will output an approximation
+##########
+
+
+##########
+def simple_search_f(filename,verbose=0,showtime=0,order=0,multiproc=0,approx=0):
+#same options as above, but the search is done from a formatted file (tightPROVE format)
+##########
+
+
+##########
+def simple_search_L(Lines,verbose=0,showtime=0,order=0,multiproc=0,approx=0):
+#same options as above, but the search is done from a list of instructions
+##########
+
+
+##########
+def subgraph_search(filename,verbose=0,showtime=0,order=0,multiproc=0,approx=0):
+#same options as above, but the algorithm first searches for subgraphs and then checks each subgraph independently
+##########
+
+
+##########
+def parallel_subgraph_search(filename,nbthread=mp.cpu_count(),verbose=0,showtime=0,order=0):
+#this function searches for attacks on different subgraph by searching in all the subgraphs in parallel.
+##########
+###################################################################
+
+
+####################2. Search for attacks(vslice)##################
+##########
+simple_search_register(filename,verbose=0,showtime=0,complete=0,multiproc=0,firstattack=0,start=1):
+#from the description of a circuit in a file, searches for attacks
+#verbose=0: nothing is written
+#verbose=1: writes the number of multiplications, inputs, refresh, and the number of operands to check. Also displays progression for the flatten function and the search function.
+#verbose=2: writes the name of each operand that is being checked, and writes something when an attack is found (the layer where the attack is is given)
+#verbose=3: writes the multiplications in Gi when an attack is found
+#verbose=4: writes the index of the nodes considered in the graph and the names of the operands that the algorithm tries to add to the list Qi
+#showtime=1: writes the time it takes to flatten the circuit, to make the 
+#showtime=2: writes the time it takes to check each operand
+#complete=1 makes the algorithm search for all possible attacks (continues to add nodes to the graph even after an attack is found on the operand)
+#multiproc=1 makes the algorithm check the operands in parallel. Maximum verbose is then 1
+#firstattack=1 makes the algorithm stop at the first attack found (only if multiprocessing is not used)
+#start defines the first operand to check. If it is greater than 1, then the first operands are not checked.
+
+#note that it is possible to use this function for bit sliced descriptions of circuits, but it is way slower.
+##########
+###################################################################
+
+
+#####################3. Place refresh(bitslice)####################
+##########
+find_refresh_v1(filename,save=0,savef=0,verbose=0,changefile=0,showgraph=0):
+#uses an heuristic method to find where to put refresh gadgets in a circuit described in a file
+#save=1 saves the refreshed circuit in the original syntax in filename_R1
+#savef=1 saves the refreshed circuit in the tightPROVE syntax in filename_f_r1
+##########
+
+
+##########
+find_refresh_v2(filename,save=0,savef=0,verbose=0,changefile=0,showgraph=0):
+#uses an heuristic method to find where to put refresh gadgets in a circuit described in a file
+#save=1 saves the refreshed circuit in the original syntax in filename_R2
+#savef=1 saves the refreshed circuit in the tightPROVE syntax in filename_f_r2
+##########
+###################################################################
+
+
+####################4. Random circuits(bitslice)###################
+##########
+rand_circ(nbi,nbo,nb_gates,p_axn):
+#creates a random circuit with a given proportion of gates and saves it in a file named "randC" in the tightPROVE format
+##########
+
+
+##########
+rand_circ2(nbi,nbo,nb_gates,p_axn):
+#creates a random circuit with a given proportion of gates and returns the corresponding list of instructions
+##########
+
+
+##########
+exact_rand_circ(nbi,nbo,nb_axn):
+#creates a random circuit with a given number of gates and saves it in a file named "randC"
+##########
+
+
+##########
+exact_rand_circ2(nbi,nbo,nb_axn):
+#creates a random circuit with a given number of gates and returns the corresponding list of instructions
+##########
+
+
+##########
+gen_randC(nt,noa,nbi,nbo,nb_gates,p_axn):
+#for a given number of attacks(noa) and a proportion p_axn, tries to generate a circuit that has 0 attacks if noa=0
+#or a circuit that have more than noa attacks otherwise
+#the algorithm stops after nt unsuccessful attempts
+##########
+
+
+##########
+gen_exact_randC(nt,noa,nbi,nbo,nb_axn):
+#for a given number of attacks(noa) and the repartition of gates nb_axn, tries to generate a circuit that has 
+#0 attacks if noa=0 or a circuit that have more than noa attacks otherwise
+#the algorithm stops after nt unsuccessful attempts
+##########
+###################################################################
+
+
+##############################5. Misc##############################
+##########
+format_code(text_name , text_ext = "", save=False):
+#transforms a code from a tightPROVE_Plus format to a tightPROVE format and saves it in a file named text_name_f.text_ext if save=True
+#it also returns the list of instructions in tightPROVE format
+##########
+
+
+##########
+def generate_simple_circuit_order_t(t):
+#creates a file called order_t that contains the description of a circuit for which there exists one attack, of order t
+##########
+
+
+##########
+def load_file(circuit_file):
+#reads the file circuit_file and outputs a list of instructions
+##########
+
+
+##########
+def write_file(circuit_file,splitlines):
+#creates (or overwrites) a file circuit_file that contains the list of instructions given in splitlines
+##########
+
+
+##########
+def write_code(func,mo_i,mo_f):
+#writes code in a file named "code" that can be verified by maskverif
+#the function to be converted is func, and can be 'and', 'xor, 'ref, 
+#or a file containing a set of these instructions
+#it creates different masked implementations of func
+#for masking orders ranging from mo_i to mo_f
+##########
+
+
+##########
+def ins_to_graph(L,size=0,highlight=[],dim3=False,root=0):  
+#prints the graph of a circuit defined by a list of instruction L, and returns the graph. 
+#'highlight' colors user-chosen gadgets
+#root defines whether a root node (connected to all inputs) is present or not
+##########
+
+
+##########
+def ins_to_flatgraph(L,size=0,highlight=[],dim3=False,root=0):
+#transforms a list of instructions L into a graph of the corresponding flattened circuit
+##########
+
+
+
+
+
+
+
+
+
+
+
+
+

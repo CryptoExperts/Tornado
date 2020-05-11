@@ -1,0 +1,25 @@
+in x 
+in y 
+out m3 m6 
+p1 = x + y 
+p1_R = ref p1 
+m1 = p1_R . y 
+m1_R = ref m1 
+m2 = m1 . y 
+p2 = m1_R + y 
+p3 = p2 + x 
+m3 = m1 . p3 
+m4 = y . p2 
+m5 = m3 . p1 
+m6 = m2 . p2 
+m7 = m2 . x 
+m8 = p1 . x 
+p4 = m3 + m6 
+p5 = m5 + m7 
+p6 = p2 + p4 
+m9 = m4 . m6 
+p7 = p6 + m2 
+m10 = p6 . y 
+p8 = p7 + y 
+m11 = m4 . m6 
+m12 = m2 . m5 

@@ -1,0 +1,21 @@
+rs = 1
+
+in x y z t
+x_R3 = ref x
+x_R2 = ref x
+z_R1 = ref z
+x_R1 = ref x
+
+T1=x+y
+T2 = and x_R1 T1
+T3 = and x_R2 y
+TT=x+t
+M1 = and x_R3 TT
+M2=x.t
+u=x+t
+u_R1 = ref u
+v=z+t
+T4=z+t
+T5=T4.z
+T6 = and z_R1 t
+m = and u_R1 v

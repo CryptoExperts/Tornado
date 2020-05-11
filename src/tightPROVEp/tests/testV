@@ -1,0 +1,13 @@
+rs = 1
+
+in x y z t
+
+T1=x+y
+T2=T1.x
+T3=x.y
+u=x+t
+v=z+t
+T4=z+t
+T5=T4.z
+T6=z.t
+m=u.v
