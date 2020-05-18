@@ -16,6 +16,8 @@ open Usuba_AST
 open Basic_utils
 open Utils
 
+let pass_name = "Unroll"
+
 
 let rec unroll_in_var (env_it:(ident,int) Hashtbl.t) (v:var) : var =
   match v with
@@ -40,7 +42,6 @@ let rec unroll_in_expr (env_it:(ident,int) Hashtbl.t) (e:expr) : expr =
   | Fun(f,l)        -> Fun(f,List.map (unroll_in_expr env_it) l)
   | Fun_v(f,x,l)    -> Fun_v(f, simpl_arith env_it x,
                              List.map (unroll_in_expr env_it) l)
-  | _ -> assert false
 
 
 let rec unroll_deqs (env_it:(ident,int) Hashtbl.t)
@@ -79,8 +80,8 @@ let unroll_def (force:bool) (def:def) : def =
          Single(vars,unroll_deqs env_it force def.id body)
       | _ -> def.node }
 
+let force_run (prog:prog) (conf:config) : prog =
+  { nodes = List.map (fun d -> unroll_def true d) prog.nodes }
 
-let unroll_prog ?(force:bool=false) (prog:prog) (conf:config) : prog =
-  (* if |conf|.unroll is true, then setting |force| to true. *)
-  let force = if conf.unroll then true else force in
-  { nodes = List.map (fun d -> unroll_def force d) prog.nodes }
+let run _ (prog:prog) (conf:config) : prog =
+  { nodes = List.map (fun d -> unroll_def conf.unroll d) prog.nodes }

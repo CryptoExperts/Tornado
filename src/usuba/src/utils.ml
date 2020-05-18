@@ -13,45 +13,50 @@ exception Break
 exception Skip
 
 let default_conf : config =
-  { warnings     = true;
-    verbose      = 1;
-    verif        = false;
-    type_check   = true;
-    clock_check  = true;
-    check_tbl    = false;
-    inlining     = true;
-    inline_all   = false;
-    light_inline = false;
-    fold_const   = true;
-    cse          = true;
-    copy_prop    = true;
-    loop_fusion  = true;
-    scheduling   = true;
-    schedule_n   = 10;
-    share_var    = false;
-    linearize_arr= true;
-    precal_tbl   = true;
-    archi        = Std;
-    bits_per_reg = 64;
-    no_arr       = false;
-    arr_entry    = true;
-    unroll       = false;
-    interleave   = 1;
-    fdti         = "";
-    lazylift     = false;
-    slicing_set  = false;
-    slicing_type = B;
-    m_set        = false;
-    m_val        = 1;
-    tightPROVE   = false;
+  { warnings       = true;
+    verbose        = 1;
+    type_check     = true;
+    check_tbl      = false;
+    bench_inline   = false;
+    auto_inline    = true;
+    light_inline   = false;
+    no_inline      = false;
+    inline_all     = false;
+    heavy_inline   = false;
+    compact_mono   = true;
+    fold_const     = true;
+    cse            = true;
+    copy_prop      = true;
+    loop_fusion    = true;
+    pre_schedule   = true;
+    scheduling     = true;
+    schedule_n     = 10;
+    share_var      = false;
+    linearize_arr  = true;
+    precal_tbl     = true;
+    archi          = Std;
+    bits_per_reg   = 64;
+    no_arr         = false;
+    arr_entry      = true;
+    unroll         = false;
+    interleave     = 0;
+    inter_factor   = 0;
+    auto_inter     = false;
+    fdti           = "";
+    lazylift       = false;
+    slicing_set    = false;
+    slicing_type   = B;
+    m_set          = false;
+    m_val          = 1;
+    tightPROVE     = false;
     tightprove_dir = "tightprove";
-    maskVerif    = false;
-    masked       = false;
-    ua_masked    = false;
-    shares       = 1;
-    gen_bench    = false;
-    keep_tables  = false;
-    compact      = false;
+    maskVerif      = false;
+    masked         = false;
+    ua_masked      = false;
+    shares         = 1;
+    gen_bench      = false;
+    keep_tables    = false;
+    compact        = false;
   }
 
 let default_dir = Varslice { uid = -1; name = "D" }
@@ -147,16 +152,15 @@ let gen_list_0_int (n: int) : int list =
     else aux (n-1) ((n-1) :: acc)
   in aux n []
 
-let make_var_d (id:ident) (typ:typ) (ck:clock)
+let make_var_d (id:ident) (typ:typ)
                (opts:var_d_opt list) (orig:(ident*var_d) list) : var_d =
   { vd_id   = id;
     vd_typ  = typ;
-    vd_ck   = ck;
     vd_opts = opts;
     vd_orig = orig }
 
-let simple_var_d (id:ident) = make_var_d id bool Defclock [] []
-let simple_typed_var_d (id:ident) (typ:typ) = make_var_d id typ Defclock [] []
+let simple_var_d (id:ident) = make_var_d id bool [] []
+let simple_typed_var_d (id:ident) (typ:typ) = make_var_d id typ [] []
 
 let env_fetch env v =
   (* try *)
@@ -325,6 +329,9 @@ let rec expand_var env_var ?(env_it=Hashtbl.create 100) ?(bitslice=false) ?(part
 let rec expand_var_partial env_var ?(env_it=Hashtbl.create 100) (v:var) : var list =
   expand_var env_var ~env_it:env_it ~partial:true v
 
+let expand_vd (vd:var_d) : var list =
+  expand_var (build_env_var [vd] [] []) (Var vd.vd_id)
+
 (* Returns the base variable of a variable (ie, remove ranges/slices/index) *)
 let rec get_var_base (v:var) : var =
   match v with
@@ -412,11 +419,11 @@ type 'a env = (string, 'a) Hashtbl.t
 let env_add (env: 'a env) (id: ident) (value: 'a) : unit =
   Hashtbl.add env id.name value
 
-(* converts an uint_n to n bools (with types and clock) *)
-let expand_intn_typed (id: ident) (n: int) (ck: clock) =
+(* converts an uint_n to n bools *)
+let expand_intn_typed (id: ident) (n: int) =
   let rec aux i =
     if i > n then []
-    else ((fresh_suffix id (string_of_int i), bool), ck) :: (aux (i+1))
+    else (fresh_suffix id (string_of_int i), bool) :: (aux (i+1))
   in aux 1
 
 (* converts an uint_n to n bools (in the format of pat) *)
@@ -523,9 +530,6 @@ let get_expr_constr_str (e:expr) : string =
   | Arith _   -> "Arith"
   | Fun _     -> "Fun"
   | Fun_v _   -> "Fun_v"
-  | Fby _     -> "Fby"
-  | Merge _   -> "Merge"
-  | When _    -> "When"
 
 let rec contains_fun (e:expr) : bool =
     match e with
@@ -537,7 +541,6 @@ let rec contains_fun (e:expr) : bool =
   | Arith(_,x,y)  -> (contains_fun x) || (contains_fun y)
   | Fun _         -> true
   | Fun_v _       -> true
-  | _ -> assert false
 
 let rec is_constant (ae:arith_expr) : bool =
   match ae with
@@ -555,7 +558,13 @@ let rec simpl_var_indices (v:var) : var =
 let is_builtin (f:ident) : bool =
   List.mem f.name [ "print"; "rand"; "refresh" ]
 
+(* Returns true if |defi| is a single; false otherwise *)
+let is_single (defi:def_i) =
+  match defi with
+  | Single _ -> true
+  | _ -> false
 
+(* Helps to get the variables and body of a "Single" node *)
 let get_vars_body = function
   | Single(vars,body) -> vars, body
   | _ -> assert false

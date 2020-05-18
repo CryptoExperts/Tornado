@@ -18,6 +18,7 @@ open Usuba_AST
 open Basic_utils
 open Utils
 
+
 (* Since the transformation of the code will produce new variable names,
    we must rename the old variables to make there won't be any conflicts
    with those new names (or with any ocaml builtin name).
@@ -49,12 +50,6 @@ let rec rename_expr (e:expr) =
   | Fun(f,l) -> if is_builtin f then Fun(f,List.map rename_expr l)
                 else Fun(fresh_suffix f "'",List.map rename_expr l)
   | Fun_v(f,e,l) -> Fun_v(fresh_suffix f "'",rename_arith_expr e,List.map rename_expr l)
-  | Fby(ei,ef,f)   -> Fby(rename_expr ei,rename_expr ef,
-                          match f with
-                          | None -> None
-                          | Some id -> Some (fresh_suffix id "'"))
-  | When(e,c,x) -> When(rename_expr e,c,fresh_suffix x "'")
-  | Merge(x,l)  -> Merge(fresh_suffix x "'",List.map (fun (c,e) -> c,rename_expr e) l)
 
 
 
@@ -85,6 +80,8 @@ let rename_def (def:def) : def =
                                              | _ -> node) nodes)
            | _ -> def.node }
 
-
-let rename_prog (p: prog) (conf:config) : prog =
+let run _ (p:prog) (conf:config) : prog =
   { nodes = List.map rename_def p.nodes }
+
+
+let as_pass = (run, "Rename")

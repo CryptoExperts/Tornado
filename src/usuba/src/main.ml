@@ -10,18 +10,21 @@ open Config
 
 let warnings    = ref false
 let verbose     = ref 1
-let verif       = ref false
 let type_check  = ref true
-let clock_check = ref false
 let check_tbl   = ref false
 
-let inlining      = ref true
+let no_inline     = ref false
+let bench_inline  = ref false
+let auto_inline   = ref true
 let inline_all    = ref false
+let heavy_inline  = ref false
 let light_inline  = ref false
+let compact_mono  = ref true
 let fold_const    = ref true
 let cse           = ref true
 let copy_prop     = ref true
 let loop_fusion   = ref true
+let pre_schedule  = ref true
 let scheduling    = ref true
 let schedule_n    = ref 10
 let share_var     = ref false
@@ -31,9 +34,10 @@ let no_arr        = ref false
 let arr_entry     = ref true
 let unroll        = ref false
 let interleave    = ref 0
+let inter_factor  = ref 0
+let auto_inter    = ref false
 
 let arch         = ref Std
-(* TODO: remove bits_per_reg (should be type-driven) *)
 let bits_per_reg = ref 64
 let ortho        = ref true
 let output       = ref ""
@@ -80,18 +84,27 @@ let gen_output_filename (file_in: string) : string =
   let out_name = last (String.split_on_char '/' full_name) in
   out_name ^ ".c"
 
-let print_c (file_in: string) (prog: Usuba_AST.prog) (conf:config) : unit =
-  (* Generating C code *)
+
+let compile (file_in: string) (prog: Usuba_AST.prog) (conf:config) : unit =
+  (* Type-checking *)
+  let prog = Type_checker.type_prog prog conf in
+
+  (* Normalizing AND optimizing *)
+  let normed_prog = Normalize.compile prog conf in
+
+  (* Generating a string of C code *)
+  let c_prog_str = Usuba_to_c.prog_to_c prog normed_prog conf file_in in
+
+  (* Opening out file *)
   let out = match !output with
     | ""  -> open_out (gen_output_filename file_in)
     | str -> open_out str in
 
-  let normalized = Normalize.compile prog conf in
-
-  let c_prog = Usuba_to_c.prog_to_c prog normalized conf file_in in
-
-  fprintf out "%s" c_prog;
+  (* Printing the C code *)
+  fprintf out "%s" c_prog_str;
   close_out out
+
+
 
 let run_tests () : unit =
   Test_constant_folding.test ();
@@ -102,22 +115,21 @@ let run_tests () : unit =
   Test_monomorphize.test ();
   Printf.printf "All tests ran.\n"
 
+
 let main () =
   Printexc.record_backtrace true;
 
   let speclist =
     [ "-w", Arg.Set warnings, "Activate warnings";
       "-v", Arg.Set_int verbose, "Set verbosity level";
-      "-verif", Arg.Set verif, "Activate verification";
       "-check-tbl", Arg.Set check_tbl, "Activate verification of tables";
       "-no-type-check", Arg.Clear type_check, "Deactivate type checking";
-      "-no-clock-check", Arg.Clear clock_check, "Deactivate clock checking";
-      "-no-checks", Arg.Unit (fun () -> type_check := false;
-                                        clock_check := false),
-                    "Deactivate both type and clock checking";
-      "-no-inline", Arg.Clear inlining, "Deactivate inlining opti";
+      "-no-inline", Arg.Set no_inline, "Deactivate inlining opti";
+      "-bench-inline", Arg.Set bench_inline, "Activate benchmark-guided inlining";
       "-inline-all", Arg.Set inline_all, "Force inlining of every node";
       "-light-inline", Arg.Set light_inline, "Inline only _inline functions";
+      "-heavy-inline", Arg.Set heavy_inline, "Inline every node, except for _no_inline";
+      "-no-compact-mono", Arg.Clear compact_mono, "Disables compact bitslice monomorphization";
       "-no-fold-const", Arg.Clear fold_const, "Deactive Constant Folding";
       "-no-CSE", Arg.Clear cse, "Deactive CSE";
       "-no-copy-prop", Arg.Clear copy_prop, "Deactive Copy Propagation";
@@ -128,6 +140,7 @@ let main () =
                            cse := false;
                            copy_prop := false),
                        "Deactive CSE, Copy propagation and Constant folding";
+      "-no-pre-sched", Arg.Clear pre_schedule, "Deactivate pre-scheduling opti";
       "-no-sched", Arg.Clear scheduling, "Deactivate scheduling opti";
       "-sched-n", Arg.Int (fun n -> schedule_n := n), "Set scheduling param";
       "-no-share", Arg.Clear share_var, "Deactivate variable sharing";
@@ -137,7 +150,9 @@ let main () =
       "-no-arr", Arg.Set no_arr, "Don't keep any array";
       "-no-arr-entry", Arg.Clear arr_entry, "Don't keep any arrays in the entry point";
       "-unroll", Arg.Set unroll, "Unroll all loops";
-      "-interleave", Arg.Int (fun n -> interleave := n), "Interleave encryptions";
+      "-interleave", Arg.Int (fun n -> interleave := n), "Sets the interleaving granularity (1 => 'a=b;c=d' becomes 'a=b;a2=b2;c=d;c2=d', 2 => 'a=b;c=d' becomes 'a=b;c=d;a2=b2;c2=d2')";
+      "-inter-factor", Arg.Int (fun n -> inter_factor := n), "Set the interleaving factor (how many instances of the cipher should be interleaved)";
+      "-auto-inter", Arg.Set auto_inter, "Activate automatic interleaving";
       "-arch", Arg.String (fun s -> arch := str_to_arch s), "Set architecture";
       "-bits-per-reg", Arg.Set_int bits_per_reg, "Set number of bits to use in the registers (with -arch std only, needs to be a multiple of 2)";
       "-fdti",Arg.Set_string fdti, "Specify the order of ti and fd (tifd or fdti)";
@@ -166,37 +181,50 @@ let main () =
                        else if !shares <> 1 then 32 else
                          bits_in_arch !arch in
 
+    let pre_sched = !pre_schedule && !scheduling in
+
     if !maskVerif then (
       unroll    := true;
       no_arr    := true;
       arr_entry := false;
     );
 
+    if !no_arr then (
+      (* When -no-arr is combined with -ua-masked, the linearization
+         could take forever, and is obviously not necessary. *)
+      linearize_arr := false;
+    );
+
     let conf = {
         warnings       =   !warnings;
         verbose        =   !verbose;
-        verif          =   !verif;
         type_check     =   !type_check;
-        clock_check    =   !clock_check;
         check_tbl      =   !check_tbl;
-        inlining       =   !inlining;
-        inline_all     =   !inline_all;
+        bench_inline   =   !bench_inline;
+        auto_inline    =   !auto_inline;
         light_inline   =   !light_inline;
+        heavy_inline   =   !heavy_inline;
+        no_inline      =   !no_inline;
+        inline_all     =   !inline_all;
+        compact_mono   =   !compact_mono;
         fold_const     =   !fold_const;
         cse            =   !cse;
         copy_prop      =   !copy_prop;
         loop_fusion    =   !loop_fusion;
+        pre_schedule   =   pre_sched; (* local var *)
         scheduling     =   !scheduling;
         schedule_n     =   !schedule_n;
         share_var      =   !share_var;
         linearize_arr  =   !linearize_arr;
         precal_tbl     =   !precal_tbl;
         archi          =   !arch;
-        bits_per_reg   =   bits_per_reg; (* local var! *)
+        bits_per_reg   =   bits_per_reg; (* local var *)
         no_arr         =   !no_arr;
         arr_entry      =   !arr_entry;
         unroll         =   !unroll;
         interleave     =   !interleave;
+        inter_factor   =   !inter_factor;
+        auto_inter     =   !auto_inter;
         fdti           =   !fdti;
         lazylift       =   !lazylift;
         slicing_set    =   !slicing_set;
@@ -214,14 +242,7 @@ let main () =
         compact        =   !compact;
       } in
 
-    if conf.archi = Std && conf.bits_per_reg mod 2 <> 0 then
-      raise (Error ("Invalid -fix-size " ^ (string_of_int conf.bits_per_reg)));
-
-    let prog = Type_checker.type_prog prog conf in
-    if !clock_check then
-      if not (Clock_checker.is_clocked prog) then
-        raise (Error "Unsound program: bad clocks");
-    print_c s prog conf in
+    compile s prog conf in
 
 
   Arg.parse speclist compile usage_msg

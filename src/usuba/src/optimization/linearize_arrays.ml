@@ -1,9 +1,46 @@
 (***************************************************************************** )
-                              expand_array.ml
+                              linearize_arrays.ml
 
    Replace "arrays of arrays" by "arrays":
       for instance u8x16[10] becomes u8x16
       (if possible)
+
+   This is typically useful for variables used in loops. For instance:
+
+      round[0] = plaintext;
+      forall i in [1, 10] {
+          round[i+1] = round_function(round[i]);
+      }
+      ciphertext = round[11]
+
+   Becomes:
+
+      round = plaintext;
+      forall i in [1, 10] {
+          round = round_function(round);
+      }
+      ciphertext = round
+
+   This reduces stack usage, and can improve performances.
+
+   This optimization is not always possible: we need to make sure that
+   the array can indeed be collapsed. For instance, in
+
+     forall i in [1, 10] {
+         round[i+1] = round_function(round[i], key[i]);
+         key[i+1] = key_function(round[i], key[i+1]);
+     }
+
+   |round| cannot be collapsed. To account for such cases, it might be
+    better to use a 2-elements arrays and do:
+
+     forall i in [1, 10] {
+         round[(i+1)%2] = round_function(round[i%2], key[i]);
+         key[i+1] = key_function(round[i%2], key[i+1]);
+     }
+
+   (not done yet: TODO & benchmark)
+
 
 ( *****************************************************************************)
 
@@ -12,7 +49,6 @@ open Usuba_AST
 open Usuba_print
 open Basic_utils
 open Utils
-
 
 exception Keep_it
 
@@ -357,8 +393,11 @@ let linearize_def (conf:config) (env_fun:(ident,def) Hashtbl.t) (def:def) : def 
      def
   | _ -> def
 
-let linearize_arrays (prog:prog) (conf:config) : prog =
+let run _ (prog:prog) (conf:config) : prog =
   let env_fun = build_env_fun prog.nodes in
   if conf.linearize_arr then
     { nodes = List.map (linearize_def conf env_fun) prog.nodes }
   else prog
+
+
+let as_pass = (run, "Linearize_arrays");

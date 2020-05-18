@@ -11,11 +11,6 @@ Extract Inductive string => "string"  [ """" "^" ].
 
 Record ident := { uid: positive;
                   name: string }.
-Inductive clock :=
-| Defclock (* Temporary, for clocks we don't know *)
-| Base
-| On (ck:clock) (x:ident)
-| Onot (ck:clock) (x:ident).
 
 Inductive log_op := And | Or | Xor | Andn | Masked (op:log_op).
 Inductive arith_op := Add | Mul | Sub | Div | Mod.
@@ -45,10 +40,6 @@ Inductive typ :=
   | Uint (d:dir) (m: mtyp) (n:N)
   | Array (t: typ) (n:arith_expr).
 
-Inductive constr :=
-  | True
-  | False.
-
 Inductive var :=
   | Var (i: ident)
   | Index (x: var)(ae: arith_expr)
@@ -67,9 +58,7 @@ Inductive expr :=
   | Arith (op: arith_op)(e1 e2: expr)
   | Fun (x: ident)(es: list expr)
   | Fun_v (x: ident)(ae: arith_expr)(es: list expr) (* nodes arrays *)
-  | Fby (e1 e2: expr)(mx: option ident)
-  | When (e: expr)(x: constr) (y: ident)
-  | Merge (x: ident)(xs: list (constr * expr)).
+.
 
 Inductive stmt_opt := Unroll | No_unroll | Pipelined | Safe_exit.
 
@@ -91,7 +80,6 @@ Inductive var_d_opt := Pconst | PlazyLift.
 Inductive var_d := {
   vd_id   : ident;
   vd_typ  : typ;
-  vd_ck   : clock;
   vd_opts : list var_d_opt;
   vd_orig : list (ident * var_d); (* A list of functions from where this variable was inlined *)
 }.
@@ -132,49 +120,60 @@ Inductive slicing := H | V | B.
 
 (* The compiler's configuration *)
 Record config := {
-  warnings     : bool;
-  verbose      : N;
-  verif        : bool;
-  type_check   : bool;
-  clock_check  : bool;
-  check_tbl    : bool;
-  inlining     : bool;
-  inline_all   : bool;
-  light_inline : bool;
-  fold_const   : bool;
-  cse          : bool;
-  copy_prop    : bool;
-  loop_fusion  : bool;
-  scheduling   : bool;
-  schedule_n   : N;
-  share_var    : bool;
-  linearize_arr: bool;
-  precal_tbl   : bool;
-  archi        : arch;
-  bits_per_reg : N;
-  no_arr       : bool;
-  arr_entry    : bool;
-  unroll       : bool;
-  interleave   : N;
-  fdti         : string;
-  lazylift     : bool;
-  slicing_set  : bool;
-  slicing_type : slicing;
-  m_set        : bool;
-  m_val        : N;
-  tightPROVE   : bool;
-  tightprove_dir : string;
-  maskVerif    : bool;
-  masked       : bool;
-  ua_masked    : bool;
-  shares       : N;
-  gen_bench    : bool;
-  keep_tables  : bool;
-  compact      : bool;
+  warnings     : bool; (* Doesn't do anything... I think *)
+  verbose      : N;    (* 5   = prints which passes are getting executed,
+                          100 = prints the Usuba program after each pass *)
+  type_check   : bool; (* Enables type-checking *)
+  check_tbl    : bool; (* Enables verification of tables to circuit conversion *)
+  bench_inline : bool; (* Chooses best inlining by benchmarking *)
+  auto_inline  : bool; (* Lets Usuba chose which nodes to inline or not *)
+  light_inline : bool; (* Inlines only nodes marked with _inline *)
+  inline_all   : bool; (* Inlines all nodes *)
+  heavy_inline : bool; (* Inline every nodes except for _no_inline ones *)
+  no_inline    : bool; (* Disables all inlining *)
+  compact_mono : bool; (* Enables compact monomorphization *)
+  fold_const   : bool; (* Enables constant folding *)
+  cse          : bool; (* Enables CSE *)
+  copy_prop    : bool; (* Enables Copy propagation *)
+  loop_fusion  : bool; (* Enables loop fusion *)
+  pre_schedule : bool; (* Enables bistlice scheduling *)
+  scheduling   : bool; (* Enables mslice scheduling *)
+  schedule_n   : N;    (* Look-behind window for mslice scheduling *)
+  share_var    : bool; (* Enables variable reuse *)
+  linearize_arr: bool; (* Enables array linearization *)
+  precal_tbl   : bool; (* Enables the use of precomputed lookup tables *)
+  archi        : arch; (* Selects the architecture to target *)
+  bits_per_reg : N;    (* Number of bits per register *)
+  no_arr       : bool; (* Removes all arrays (except in parameters) *)
+  arr_entry    : bool; (* Removes arrays from parameters *)
+  unroll       : bool; (* Unrolls all loops *)
+  interleave   : N;    (* Interleaving granularity *)
+  inter_factor : N;    (* Interleaving factor *)
+  auto_inter   : bool; (* Automatically interleave *)
+  fdti         : string; (* *)
+  lazylift     : bool; (* Enables lazy lifting *)
+  slicing_set  : bool; (* If true, it means a slicing direction is selected,
+                          and slicing_type (below) contains it *)
+  slicing_type : slicing; (* Slicing direction *)
+  m_set        : bool; (* If true, it means a word size is selected,
+                          and m_val (below) contains it *)
+  m_val        : N;    (* word size *)
+  tightPROVE   : bool; (* Enables tightPROVE masking verification *)
+  tightprove_dir : string; (* Tightprove's output directory *)
+  maskVerif    : bool; (* Enables maskVerif code generation *)
+  masked       : bool; (* Enables masking by using special AND/OR/NOT/XOR macros *)
+  ua_masked    : bool; (* Enables masking within Usuba; only a custom
+                          AND macro is needed *)
+  shares       : N;    (* Number of shares for masking *)
+  gen_bench    : bool; (* Generates a benchmarking function *)
+  keep_tables  : bool; (* Keeps tables as tables rather than converting
+                          them into circuits *)
+  compact      : bool; (* (broken) Generates loops when unfolding
+                          operators instead of a list of equations. *)
 }.
 
 Set Extraction KeepSingleton.
 Extraction "usuba_AST.ml"
            config prog def def_opt def_i p var_d var_d_opt
            deq deq_i expr var typ arith_expr shift_op
-           arith_op log_op clock ident arch.
+           arith_op log_op ident arch.
