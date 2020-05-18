@@ -1,8 +1,10 @@
+# -*- coding: utf-8 -*-
+
 ###############################################################################
 #
 # Implementation of tightPROVE+ in SageMath
 #
-# tightPROVE+ is a formal verification tool for the tight register probing  
+# tightPROVE+ is a formal verification tool for the tight register probing
 # security of masked implementations, introduced in https://ia.cr/2020/506
 #
 # File: tightprove-exec.sage
@@ -11,7 +13,7 @@
 # Author: Raphaël Wintersdorff
 #
 # Copyright (C) 2019 CryptoExperts
-# 
+#
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
 # the Free Software Foundation, either version 3 of the License, or
