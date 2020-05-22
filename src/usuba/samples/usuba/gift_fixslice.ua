@@ -12,7 +12,7 @@ tel
 
 # Not the traditional swapmove, but since it's always called with
 # twice the same parameters, it's a bit simpler like that.
-_inline node swapmove_1(a,mask:u32,n:nat) returns (aR:u32)
+node swapmove_1(a,mask:u32,n:nat) returns (aR:u32)
 vars tmp:u32
 let
     tmp = (a ^ (a >> n)) & mask;
