@@ -15,6 +15,17 @@ open Basic_utils
 open Utils
 open Pass_runner
 
+let pre_inline = ref false
+let orig_conf  = ref default_conf
+
+
+(* Returns true is the inlining level in |conf| is more aggressive
+   than auto_inline. *)
+let is_more_aggressive_than_auto (conf:config) : bool =
+  if conf.inline_all || conf.heavy_inline then true
+  else false
+
+
 (* This module checks if a node _must_ be inlined and if so, returns
    it. For now, a node must be inlined if it uses shifts of sizes
    depending on the parameters. *)
@@ -336,28 +347,66 @@ let do_inline (prog:prog) (to_inline:def) : prog =
                   | _ -> def) prog.nodes }
 
 
+
+(* is_n_percent_assign returns true if |deqs| contains more than |n|
+   percent assginments. *)
+let is_more_than_n_percent_assign (n:int) (deqs:deq list) : bool =
+  let rec get_assigns (deqs:deq list) : int * int =
+    List.fold_left (fun (asgns,tot) deq ->
+                    match deq.content with
+                    | Eqn(_,ExpVar _,_) -> (asgns+1, tot+1)
+                    | Loop(_,_,_,dl,_) ->
+                       let (asgns',tot') = get_assigns dl in
+                       (asgns+asgns', tot+tot')
+                    | _ -> (asgns, tot+1)) (0,0) deqs in
+  let (asgns, tot) = get_assigns deqs in
+  (float_of_int tot) *. (float_of_int n) /. 100. <= (float_of_int asgns)
+
 (* Heuristically decides (ie returns true of false) if |def| should be
    inlined or not. *)
 let should_inline_heuristic (def:def) : bool =
+  let in_size  = List.fold_left (+) 0
+                    (List.map (fun vd -> typ_size vd.vd_typ) def.p_in) in
+  let out_size = List.fold_left (+) 0
+                    (List.map (fun vd -> typ_size vd.vd_typ) def.p_out) in
 
-  (* |is_full_assign| returns true if |deqs| only contains assignments *)
-  let rec is_full_assign (deqs:deq list) : bool =
-    List.for_all (fun deq ->
-                  match deq.content with
-                  | Eqn(_,ExpVar _,_) -> true
-                  | Loop(_,_,_,dl,_) -> is_full_assign dl
-                  | _ -> false) deqs in
 
-  if (List.length def.p_in) + (List.length def.p_out) > 8 then
+  if (List.length def.p_in) + (List.length def.p_out) > 10 then
     (* More than 8 parameters -> will need to be passed on the stack
        -> inlining *)
     true
-  else if is_single def.node && is_full_assign (get_body def.node) then
-    (* Node only contains assignments -> it's a permutation of some
-       kind -> inlining *)
+  else if (in_size > 31) && (out_size > 31) then
     true
+  else if is_single def.node then
+    if is_more_than_n_percent_assign 50 (get_body def.node) then
+      (* Node contains more than 50% assignments -> probably better to
+         inline it *)
+      true
+    else
+      false
   else
+    (* Not a regular node; should not really happen (but it can
+    because of the hack to keep lookup tables with -keep-tables) *)
     false
+
+(* Returns true if |def| is chosen to be pre-inlined (in order to
+   pre_schedule to be as effective as possible). For now, the
+   condition is: more than 31 inputs and more than 31 outputs. The
+   reasoning being that if this function takes that much
+   inputs/outputs, it's very unlikely an Sbox and more likely either a
+   linear function, or a wrapper around several S-boxes. In all cases,
+   we'd rather have it inlined for pre-schedule to be able to do
+   something. Small exception: if |def| is _no_inline and -inline-all
+   wasn't enabled, then it's not inlined. *)
+let should_pre_inline (def:def) : bool =
+  let in_size  = List.fold_left (+) 0
+                    (List.map (fun vd -> typ_size vd.vd_typ) def.p_in) in
+  let out_size = List.fold_left (+) 0
+                    (List.map (fun vd -> typ_size vd.vd_typ) def.p_out) in
+  if (not !orig_conf.inline_all) && (is_noinline def) then false
+  else ((in_size > 31) && (out_size > 31))
+       || (is_more_than_n_percent_assign 65 (get_body def.node))
+
 
 (* Returns true if def doesn't contain any function call,
    or if those calls are to functions that are not going
@@ -388,6 +437,8 @@ and can_inline env inlined conf (node:def) : bool =
     false
   else if conf.light_inline then
     is_inline node (* Only inline if node is marked as "_inline" *)
+  else if !pre_inline then
+    should_pre_inline node
   else if conf.inline_all then
     true (* All nodes are inlined if -inline-all is active *)
   else if conf.heavy_inline then
@@ -434,7 +485,7 @@ let rec _inline (prog:prog) (conf:config) inlined : prog =
 
 
 (* Main inlining function. _inline actually does most of the job *)
-let run _ (prog:prog) (conf:config) : prog =
+let run_common (prog:prog) (conf:config) : prog =
   if conf.no_inline then prog
   else
     (* Hashtbl containing the inlining status of each node:
@@ -447,11 +498,29 @@ let run _ (prog:prog) (conf:config) : prog =
     (* And now, perform the inlining *)
     _inline prog conf inlined
 
+let run _ (prog:prog) (conf:config) : prog =
+  pre_inline := false;
+  run_common prog conf
+
+let run_pre_inline _ (prog:prog) (conf:config) : prog =
+  pre_inline := true;
+  orig_conf  := conf;
+  if is_more_aggressive_than_auto conf then
+    let conf = { conf with auto_inline  = true;
+                           heavy_inline = false;
+                           inline_all   = false } in
+    run_common prog conf
+  else
+    prog
+
+
 
 let as_pass = (run, "Inline")
+let as_pass_pre = (run_pre_inline, "Inline-pre")
 
 
 let run_with_cont (runner:pass_runner) (prog:prog) (conf:config) nexts : prog =
+  pre_inline := false;
   if not conf.bench_inline then
     runner#run_modules_guard ~conf:conf ((as_pass, true) :: nexts) prog
   else
