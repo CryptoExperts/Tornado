@@ -37,7 +37,7 @@ COPY docker/motd.sh $HOME/.motd.sh
 RUN echo ". ~/.motd.sh" >> $HOME/.bashrc
 
 # Include documentation
-COPY Readme.md $HOME/
+COPY README.md $HOME/
 
 # Copy & compile Usuba and Tightprove+
 COPY --chown=eval:eval src $HOME/tornado
